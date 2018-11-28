@@ -29,15 +29,16 @@ global {
 	point meeting_point <- {50,50};
     list<Participant> meetingPointList;
     
-    //VIP stuff 
-    point sitting_room <- {50, 90};
-    bool VipInDaHuse <- false;
-    point VipStage;
-    
 	int cnt <- 0;
     
 	list<point> stage_position <- [{25,25}, {75,25}, {75,75}, {25,75}];
 	list<Stage> ALL_STAGES;
+	
+	//VIP stuff 
+    VIP theVip;
+    point VIP_room <- {50, 90};
+    bool VipInDaHuse <- false;
+    point VipStage <- stage_position[0];
     
     init{
         create Stage number: NB_STAGES;
@@ -92,12 +93,14 @@ species Stage{
 species VIP skills:[moving]{
 	int myCycles <- 0;
 	
-	aspect base {
-		draw circle(2) color: #orange;
+	init{
+		theVip <- self;
 	}
 	
+	file dj_icon <- file("../images/martingarrix2.png");
+	
 	reflex moveHome when: !VipInDaHuse{
-		do goto target:sitting_room speed: 1;	
+		do goto target:VIP_room speed: 1;	
 	}
 	
 	reflex selectStage{
@@ -119,6 +122,10 @@ species VIP skills:[moving]{
 	reflex moveToStage when: VipInDaHuse{
 		do goto target:VipStage speed: 1;
 	}
+	
+	aspect icon {
+		draw dj_icon size: 8.0 ;
+    }
 }
 
 species Participant skills:[moving]{
@@ -145,9 +152,15 @@ species Participant skills:[moving]{
 	
 	rgb color <- #blue;
 	bool initialized <- false;
+	bool crazyForVip <- false;
+	
+	float chasingSpeed <- rnd(0.1, 0.9);
 	
 	init{
 		nearest_stages <- nearest_stages sort_by (location distance_to each);
+		if rnd(0,100) > 60{
+			crazyForVip <- true;
+		}
 	}
 	
 	int stages_visited <- 0;
@@ -163,30 +176,38 @@ species Participant skills:[moving]{
 			
 			self.initialized <- true;
 		}
-		
-		draw circle(1.0) color: color;
+		draw circle(1.0) color: color; 	
 	}
 	
 	reflex visit_stage when: self.stages_visited < NB_STAGES{
-		point target <- self.nearest_stages[self.stages_visited];
-		if location distance_to target > 2{
-			do goto target:target speed: 1.0;
-		} 
-		else{	
-			loop a over:ALL_STAGES{
-				if a.location = target{
-					ask a{
-						float utility <- (self.music*myself.music) + (self.lights*myself.lights) 
-							+ (self.visuals*myself.visuals) + (self.fireworks*myself.fireworks)
-							+ (self.dancers*myself.dancers);
-							
-						add utility to: myself.stage_memory;
+		point target;
+		
+		if (theVip.location distance_to VIP_room > 2 and theVip.location distance_to VipStage > 2)
+			and crazyForVip{
+			target <- theVip.location;
+			do wander;
+			do goto target:target speed: chasingSpeed;
+		} else{
+			target <- self.nearest_stages[self.stages_visited];
+			if location distance_to target > 2{
+				do goto target:target speed: 1.0;
+			} 
+			else{	
+				loop a over:ALL_STAGES{
+					if a.location = target{
+						ask a{
+							float utility <- (self.music*myself.music) + (self.lights*myself.lights) 
+								+ (self.visuals*myself.visuals) + (self.fireworks*myself.fireworks)
+								+ (self.dancers*myself.dancers);
+								
+							add utility to: myself.stage_memory;
+						}
+						break;
 					}
-					break;
 				}
+				
+				self.stages_visited <- self.stages_visited + 1;
 			}
-			
-			self.stages_visited <- self.stages_visited + 1;
 		}
 	}
 	
@@ -378,10 +399,10 @@ experiment stage_info type: gui {
         display main_display {
             species Stage aspect: base ;
             species Participant aspect:base;
-            species VIP aspect:base;
+            species VIP aspect:icon;
             
-            graphics 'sitting_room'{
-				draw box(4,6,4) color: #orange at: sitting_room;
+            graphics 'VIP_room'{
+				draw box(8,8,8) color: #orange at: VIP_room;
 			}
         }
     }
